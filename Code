@@ -1,0 +1,111 @@
+#Detecting Flu Epidemics via Search Engine Query Data
+
+
+FluTrain <- read.csv(file.choose())
+FluTest <- read.csv(file.choose())
+
+str(FluTrain)
+#Which week corresponds to the highest percentage of ILI-related query fraction?
+which.max(FluTrain$ILI)
+FluTrain$Week[303]   #Answer: 2009-10-18
+
+#Problem 1.2 - Understanding the Data
+#Let us now understand the data at an aggregate level. Plot the histogram of the dependent variable, ILI. What best describes the distribution of values of ILI?
+hist(FluTrain$ILI)
+
+#Problem 1.3 - Understanding the Data
+#When handling a skewed dependent variable, it is often useful to predict the logarithm of the dependent variable instead of the dependent variable itself -- 
+#this prevents the small number of unusually large or small observations from having an undue influence on the sum of squared errors of predictive models. 
+#In this problem, we will predict the natural log of the ILI variable, which can be computed in R using the log() function.
+plot(log(FluTrain$ILI), FluTrain$Queries)
+#There is a positive, linear relationship between log(ILI) and Queries. correct
+
+
+#Problem 2.2 - Linear Regression Model
+#Let's call the regression model from the previous problem (Problem 2.1) FluTrend1 and run it in R. Hint: to take the logarithm of a variable Var in a regression equation, 
+#you simply use log(Var) when specifying the formula to the lm() function.
+
+FluTrend1 = lm(log(ILI)~Queries, data = FluTrain)
+#What is the training set R-squared value for FluTrend1 model (the "Multiple R-squared")?
+summary(FluTrend1)    #Multiple R-squared:  0.709
+
+#Problem 3.1 - Performance on the Test Set
+#What is our estimate for the percentage of ILI-related physician visits for the week of March 11, 2012? (HINT: You can either just output FluTest$Week to find which element corresponds to March 11, 2012, or you can use the "which" function in R. To learn more about the which function, type ?which in your R console.)
+
+PredTest1 = exp(predict(FluTrend1, newdata=FluTest))
+which(FluTest$Week == "2012-03-11 - 2012-03-17")
+PredTest1[11]
+
+#Problem 3.2 - Performance on the Test Set
+#What is the relative error betweeen the estimate (our prediction) and the observed value for the week of March 11, 2012? Note that the relative error is calculated as
+FluTest$ILI[11]
+# (2.293422 - 2.187378)/2.293422. #Answer: 04624
+
+
+#Problem 3.3 - Performance on the Test Set
+#What is the Root Mean Square Error (RMSE) between our estimates and the actual observations for the percentage of ILI-related physician visits, on the test set?
+SSE = sum((PredTest1 - FluTest$ILI)^2)
+RMSE = sqrt(SSE / nrow(FluTest))
+RMSE        #0.7490645
+
+#Problem 4.1 - Training a Time Series Model
+#The observations in this dataset are consecutive weekly measurements of the dependent and independent variables. This sort of dataset is called a "time series." 
+#Often, statistical models can be improved by predicting the current value of the dependent variable using the value of the dependent variable from earlier weeks. 
+#In our models, this means we will predict the ILI variable in the current week using values of the ILI variable from previous weeks.
+#First, we need to decide the amount of time to lag the observations. Because the ILI variable is reported with a 1- or 2-week lag, a decision maker cannot rely on the previous week's ILI 
+#value to predict the current week's value. Instead, the decision maker will only have data available from 2 or more weeks ago. We will build a variable called ILILag2 that contains the 
+#ILI value from 2 weeks before the current observation.To do so, we will use the "zoo" package, which provides a number of helpful methods for time series models. 
+#While many functions are built into R, you need to add new packages to use some functions. New packages can be installed and loaded easily in R, and we will do this many times in this class.
+
+library(zoo)
+ILILag2 = lag(zoo(FluTrain$ILI),-2, na.pad = TRUE)
+FluTrain$ILILag2 = coredata(ILILag2)
+summary(ILILag2)
+#How many values are missing in the new ILILag2 variable?
+#Answer : 2 
+
+#Problem 4.2 - Training a Time Series Model
+#Use the plot() function to plot the log of ILILag2 against the log of ILI. Which best describes the relationship between these two variables?
+
+plot(log(FluTrain$ILILag2), log(FluTrain$ILI))
+#There is a strong positive relationship between log(ILILag2) and log(ILI).
+
+
+#
+Problem 4.3 - Training a Time Series Model
+#Train a linear regression model on the FluTrain dataset to predict the log of the ILI variable using 
+#the Queries variable as well as the log of the ILILag2 variable. Call this model FluTrend2.
+
+FluTrend2 = lm(log(ILI) ~ Queries + log(ILILag2), data = FluTrain )
+summary(FluTrend2)
+#What is the R^2 value of the FluTrend2 model?
+#Multiple R-squared:  0.9063
+
+#Problem 5.1 - Evaluating the Time Series Model in the Test Set
+#So far, we have only added the ILILag2 variable to the FluTrain data frame. To make predictions with our 
+#FluTrend2 model, we will also need to add ILILag2 to the FluTest data frame (note that adding variables before 
+#splitting into a training and testing set can prevent this duplication of effort).
+#Modify the code from the previous subproblem to add an ILILag2 variable to the FluTest data frame. 
+ILILag2 = lag(zoo(FluTest$ILI), -2, na.pad=TRUE)
+FluTest$ILILag2 = coredata(ILILag2)
+summary(FluTest$ILILag2)
+
+#How many missing values are there in this new variable?
+#Answer : 2
+
+#Problem 5.4 - Evaluating the Time Series Model in the Test Set
+
+PredTest2 = exp(predict(FluTrend2, newdata = FluTest))
+SSE4 = sum((PredTest2 - FluTest$ILI)^2)
+RMSE4 = sqrt(SSE4 / nrow(FluTest)) 
+RMSE4
+
+
+
+
+
+
+
+
+
+
